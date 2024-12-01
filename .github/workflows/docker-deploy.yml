@@ -1,14 +1,6 @@
-name: Docker Deploy
-
-on:
-  push:
-    branches:
-      - master
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -24,14 +16,14 @@ jobs:
           docker build -t my-node-project .
           docker save my-node-project > my-node-project.tar
 
-      - name: Copy Docker image to host
-        uses: appleboy/scp-action@v0.1.15  # Updated version
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.5.3
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.PRIVATE_KEY }}
-          source: my-node-project.tar
-          target: /home/<your-username>/
+          ssh-private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Copy Docker image to host (via SCP)
+        run: |
+          scp my-node-project.tar username@${{ secrets.HOST }}:/home/username/
 
       - name: SSH and Run Docker
         uses: appleboy/ssh-action@v0.1.6
@@ -40,7 +32,7 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.PRIVATE_KEY }}
           script: |
-            docker load < /home/<your-username>/my-node-project.tar
+            docker load < /home/username/my-node-project.tar
             docker stop my-node-project || true
             docker rm my-node-project || true
             docker run -d -p 3000:3000 --name my-node-project my-node-project
