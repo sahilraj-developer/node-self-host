@@ -1,0 +1,46 @@
+name: Docker Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t my-node-project .
+          docker save my-node-project > my-node-project.tar
+
+      - name: Copy Docker image to host
+        uses: appleboy/scp-action@v0.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          source: my-node-project.tar
+          target: /home/<your-username>/
+
+      - name: SSH and Run Docker
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          script: |
+            docker load < /home/<your-username>/my-node-project.tar
+            docker stop my-node-project || true
+            docker rm my-node-project || true
+            docker run -d -p 3000:3000 --name my-node-project my-node-project
